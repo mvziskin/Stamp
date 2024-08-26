@@ -45,11 +45,13 @@
         #videoElement {
             width: 100%;
             background-color: #2c2c2c;
-            display: none;
         }
         #canvasElement {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            background-color: #2c2c2c;
+            height: 100%;
         }
         #gallery {
             display: flex;
@@ -111,44 +113,42 @@
                 const constraints = {
                     video: {
                         facingMode: 'environment',
-                        advanced: [{
-                            zoom: cameraType === 'telephoto' ? 2 : 0.5
-                        }]
+                        zoom: cameraType === 'telephoto' ? 2 : 0.5
                     },
                     audio: false
                 };
 
-                console.log("Requesting camera access with constraints:", constraints);
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
-                console.log("Camera access granted, stream:", stream);
-
                 const videoElement = document.getElementById('videoElement');
-                if (!videoElement) {
-                    throw new Error("Video element not found");
-                }
-
                 videoElement.srcObject = stream;
-                console.log("Stream set to video element");
-
+                
                 videoElement.onloadedmetadata = () => {
-                    console.log("Video metadata loaded");
                     const canvas = document.getElementById('canvasElement');
-                    if (!canvas) {
-                        throw new Error("Canvas element not found");
-                    }
                     canvas.width = videoElement.videoWidth;
                     canvas.height = videoElement.videoHeight;
-                    console.log("Canvas dimensions set");
-                    requestAnimationFrame(updateOverlay);
+                    updatePreview();
                 };
-
-                videoElement.onerror = (error) => {
-                    logError("Video element error: " + error);
-                };
-
             } catch (err) {
                 logError("Error accessing the camera: " + err.message);
             }
+        }
+
+        function updatePreview() {
+            const video = document.getElementById('videoElement');
+            const canvas = document.getElementById('canvasElement');
+            const ctx = canvas.getContext('2d');
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            
+            const timestamp = new Date().toLocaleString();
+            ctx.fillText(`Timestamp: ${timestamp}`, 10, 30);
+            ctx.fillText(`GPS: ${gpsCoordinates}`, 10, 60);
+            ctx.fillText(`Camera: ${currentCamera}`, 10, 90);
+
+            requestAnimationFrame(updatePreview);
         }
 
         async function switchCamera(cameraType) {
@@ -164,7 +164,6 @@
             const img = document.createElement('img');
             img.src = canvas.toDataURL('image/jpeg');
             document.getElementById('gallery').prepend(img);
-            console.log("Photo taken and added to gallery");
         }
 
         function toggleRecording() {
@@ -185,7 +184,7 @@
             recordingInterval = setInterval(() => {
                 const canvas = document.getElementById('canvasElement');
                 recordedFrames.push(canvas.toDataURL('image/jpeg', 0.5));
-            }, 100); // Capture a frame every 100ms (10 fps)
+            }, 100);
         }
 
         function stopRecording() {
@@ -200,7 +199,7 @@
             video.muted = true;
 
             let currentFrame = 0;
-            const frameDuration = 100; // Duration of each frame in milliseconds
+            const frameDuration = 100;
 
             video.oncanplay = () => {
                 if (currentFrame < recordedFrames.length) {
@@ -220,31 +219,7 @@
             };
 
             document.getElementById('gallery').prepend(video);
-            video.oncanplay(); // Start playing the frames
-        }
-
-        function updateOverlay() {
-            const video = document.getElementById('videoElement');
-            const canvas = document.getElementById('canvasElement');
-            const ctx = canvas.getContext('2d');
-
-            // Clear the canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw the current frame from the video
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Add overlay information
-            ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
-            
-            const timestamp = new Date().toLocaleString();
-            ctx.fillText(`Timestamp: ${timestamp}`, 10, 30);
-            ctx.fillText(`GPS: ${gpsCoordinates}`, 10, 60);
-            ctx.fillText(`Camera: ${currentCamera}`, 10, 90);
-
-            // Request the next animation frame
-            requestAnimationFrame(updateOverlay);
+            video.oncanplay();
         }
 
         function getGPSLocation() {
@@ -265,7 +240,6 @@
             }
         }
 
-        // Initialize the camera and GPS when the page loads
         document.addEventListener('DOMContentLoaded', () => {
             initCamera();
             getGPSLocation();
