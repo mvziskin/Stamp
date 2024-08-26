@@ -11,25 +11,29 @@
 <body>
     <h1>Stamp</h1>
 
-    <div id="controls">
-        <button id="startCapture">Start Capture</button>
-        <button id="stopCapture">Stop Capture</button>
-        <button id="switchCamera">Switch Camera</button>
-        <button id="takePhoto">Take Photo</button>
-        <button id="zoom05">0.5x Zoom</button>
-        <button id="zoom1">1x Zoom</button>
-        <button id="zoom5">5x Zoom</button>
+    <div id="cameraContainer">
+        <!-- The video element will be inserted here by JavaScript -->
+    </div>
+
+    <div id="controls" role="toolbar" aria-label="Camera controls">
+        <button id="startCapture" aria-label="Start video capture">Start Capture</button>
+        <button id="stopCapture" aria-label="Stop video capture">Stop Capture</button>
+        <button id="switchCamera" aria-label="Switch camera">Switch Camera</button>
+        <button id="takePhoto" aria-label="Take photo">Take Photo</button>
+        <button id="zoom05" aria-label="Set zoom to 0.5x">0.5x Zoom</button>
+        <button id="zoom1" aria-label="Set zoom to 1x">1x Zoom</button>
+        <button id="zoom5" aria-label="Set zoom to 5x">5x Zoom</button>
     </div>
 
     <div id="libraryControls">
-        <button id="processMedia">Process Selected Media</button>
+        <button id="processMedia" aria-label="Process selected media">Process Selected Media</button>
     </div>
 
     <div id="processedControls" style="display:none;">
-        <button id="saveMedia">Save Processed Media</button>
+        <button id="saveMedia" aria-label="Save processed media">Save Processed Media</button>
     </div>
 
-    <div id="loadingIndicator" style="display:none;">
+    <div id="loadingIndicator" style="display:none;" role="status" aria-live="polite">
         Processing... Please wait.
     </div>
 
