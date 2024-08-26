@@ -10,17 +10,28 @@ const loadingIndicator = document.getElementById('loadingIndicator');
 const cameraContainer = document.getElementById('cameraContainer');
 
 let stream;
+let mediaRecorder;
+let recordedChunks = [];
 let currentZoom = 1;
 
 // Start video capture
 startCaptureBtn.addEventListener('click', async () => {
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: true });
         const videoElement = document.createElement('video');
         videoElement.srcObject = stream;
         videoElement.play();
         cameraContainer.innerHTML = ''; // Clear any existing content
         cameraContainer.appendChild(videoElement);
+
+        // Set up MediaRecorder
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        };
+        mediaRecorder.start();
     } catch (err) {
         console.error('Error accessing camera:', err);
     }
@@ -29,6 +40,7 @@ startCaptureBtn.addEventListener('click', async () => {
 // Stop video capture
 stopCaptureBtn.addEventListener('click', () => {
     if (stream) {
+        mediaRecorder.stop();
         stream.getTracks().forEach(track => track.stop());
         cameraContainer.innerHTML = ''; // Remove the video element
     }
@@ -43,13 +55,22 @@ switchCameraBtn.addEventListener('click', async () => {
         
         try {
             stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: newFacingMode, width: 320, height: 240 } 
+                video: { facingMode: newFacingMode, width: 320, height: 240 },
+                audio: true
             });
             const videoElement = cameraContainer.querySelector('video');
             if (videoElement) {
                 videoElement.srcObject = stream;
                 videoElement.play();
             }
+            // Set up new MediaRecorder
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            mediaRecorder.start();
         } catch (err) {
             console.error('Error switching camera:', err);
         }
@@ -64,9 +85,30 @@ takePhotoBtn.addEventListener('click', () => {
         canvas.width = videoElement.videoWidth;
         canvas.height = videoElement.videoHeight;
         canvas.getContext('2d').drawImage(videoElement, 0, 0);
-        const img = document.createElement('img');
-        img.src = canvas.toDataURL('image/png');
-        document.body.appendChild(img);
+        
+        // Try to save to photo library
+        canvas.toBlob(async (blob) => {
+            try {
+                const newHandle = await window.showSaveFilePicker({
+                    suggestedName: 'photo.png',
+                    types: [{
+                        description: 'PNG Files',
+                        accept: {'image/png': ['.png']},
+                    }],
+                });
+                const writableStream = await newHandle.createWritable();
+                await writableStream.write(blob);
+                await writableStream.close();
+                alert('Photo saved to library successfully!');
+            } catch (err) {
+                console.error('Error saving to library:', err);
+                // Fallback: offer download
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = 'photo.png';
+                link.click();
+            }
+        }, 'image/png');
     }
 });
 
@@ -81,17 +123,49 @@ zoomBtns.forEach(btn => {
     });
 });
 
-// Process media (placeholder function)
-processMediaBtn.addEventListener('click', () => {
+// Process media (now saves video)
+processMediaBtn.addEventListener('click', async () => {
     loadingIndicator.style.display = 'block';
-    // Simulating processing time
-    setTimeout(() => {
+    
+    if (recordedChunks.length === 0) {
+        alert('No video recorded yet!');
         loadingIndicator.style.display = 'none';
-        document.getElementById('processedControls').style.display = 'block';
-    }, 2000);
+        return;
+    }
+
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    
+    try {
+        const newHandle = await window.showSaveFilePicker({
+            suggestedName: 'video.webm',
+            types: [{
+                description: 'WebM Files',
+                accept: {'video/webm': ['.webm']},
+            }],
+        });
+        const writableStream = await newHandle.createWritable();
+        await writableStream.write(blob);
+        await writableStream.close();
+        alert('Video saved to library successfully!');
+    } catch (err) {
+        console.error('Error saving to library:', err);
+        // Fallback: offer download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        document.body.appendChild(a);
+        a.style = 'display: none';
+        a.href = url;
+        a.download = 'video.webm';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    loadingIndicator.style.display = 'none';
+    document.getElementById('processedControls').style.display = 'block';
+    recordedChunks = []; // Clear recorded chunks for next recording
 });
 
-// Save processed media (placeholder function)
+// Save processed media button is now redundant, so we'll remove its functionality
 saveMediaBtn.addEventListener('click', () => {
-    alert('Media saved successfully!');
+    alert('Media has already been saved.');
 });
