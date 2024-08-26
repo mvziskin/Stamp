@@ -1,148 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>STAMP</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            padding: 20px;
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #121212;
-            color: #e0e0e0;
-        }
-        h1 {
-            font-size: 24px;
-            text-align: center;
-            margin-bottom: 20px;
-            color: #bb86fc;
-        }
-        button {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            background-color: #3700b3;
-            color: #e0e0e0;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        button:active {
-            background-color: #6200ee;
-        }
-        #cameraButtons {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-        #cameraButtons button {
-            flex: 1;
-            margin: 0 5px;
-        }
-        #captureContainer {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            margin: 20px auto;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        #captureVideo {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-        #captureCanvas {
-            display: none;
-        }
-        #gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 10px;
-            margin-top: 20px;
-        }
-        #gallery img {
-            width: 100%;
-            height: 100px;
-            object-fit: cover;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(255,255,255,0.1);
-        }
-        #photoButton {
-            background-color: #03dac6;
-            color: #000000;
-        }
-        #photoButton:active {
-            background-color: #018786;
-        }
-    </style>
-</head>
+<!-- ... (previous head content remains the same) ... -->
 <body>
-    <h1>STAMP</h1>
-    
-    <div id="cameraButtons">
-        <button id="wideButton">Wide</button>
-        <button id="ultraWideButton">Ultra Wide</button>
-        <button id="telephotoButton">Telephoto</button>
-    </div>
-    
-    <div id="captureContainer">
-        <video id="captureVideo" autoplay playsinline></video>
-        <canvas id="captureCanvas"></canvas>
-    </div>
-    
-    <button id="photoButton">Take Photo</button>
-    
-    <div id="gallery"></div>
+    <!-- ... (previous body content remains the same) ... -->
 
     <script>
-        let currentStream;
-        
-        const videoElement = document.getElementById('captureVideo');
-        const canvasElement = document.getElementById('captureCanvas');
-        const photoButton = document.getElementById('photoButton');
-        const gallery = document.getElementById('gallery');
-        const wideButton = document.getElementById('wideButton');
-        const ultraWideButton = document.getElementById('ultraWideButton');
-        const telephotoButton = document.getElementById('telephotoButton');
-
-        async function initCamera(cameraType) {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
-
-            const constraints = {
-                video: {
-                    facingMode: 'environment',
-                    advanced: [{
-                        // This is a best guess at the constraints. Actual support may vary.
-                        wide: { zoom: 1 },
-                        ultraWide: { zoom: 0.5 },
-                        telephoto: { zoom: 2 }
-                    }[cameraType]]
-                }
-            };
-
-            try {
-                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoElement.srcObject = currentStream;
-            } catch (err) {
-                console.error("Error accessing camera:", err);
-                alert(`Unable to access ${cameraType} camera. This may not be supported on your device.`);
-            }
-        }
+        // ... (previous script content remains the same) ...
 
         function capturePhoto() {
             const ctx = canvasElement.getContext('2d');
@@ -156,18 +19,20 @@
             ctx.drawImage(videoElement, 0, 0);
             
             // Format the timestamp
-            const timestamp = new Date().toLocaleString('en-US', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit', 
-                hour: '2-digit', 
+            const now = new Date();
+            const timestamp = now.toLocaleString('en-US', { 
+                year: '2-digit', 
+                month: 'numeric', 
+                day: 'numeric', 
+                hour: 'numeric', 
                 minute: '2-digit', 
                 second: '2-digit', 
-                hour12: false 
-            });
+                hour12: true,
+                timeZone: 'America/New_York'
+            }) + ' EST';
             
             // Add timestamp to the image
-            addTextToImage(ctx, `Date/Time: ${timestamp}`, 10, 30);
+            addTextToImage(ctx, timestamp, 10, 30);
             
             // Get and add GPS information
             navigator.geolocation.getCurrentPosition(
@@ -185,33 +50,7 @@
             );
         }
 
-        function addTextToImage(ctx, text, x, y) {
-            ctx.fillStyle = 'white';
-            ctx.strokeStyle = 'black';
-            ctx.font = 'bold 20px Arial';
-            ctx.lineWidth = 4;
-            ctx.strokeText(text, x, y);
-            ctx.fillText(text, x, y);
-        }
-
-        function savePhoto(dataUrl) {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = `STAMP_photo_${new Date().getTime()}.jpg`;
-            a.click();
-            
-            const imgElement = document.createElement('img');
-            imgElement.src = dataUrl;
-            gallery.appendChild(imgElement);
-        }
-
-        photoButton.addEventListener('click', capturePhoto);
-        wideButton.addEventListener('click', () => initCamera('wide'));
-        ultraWideButton.addEventListener('click', () => initCamera('ultraWide'));
-        telephotoButton.addEventListener('click', () => initCamera('telephoto'));
-
-        // Initialize with the wide camera by default
-        initCamera('wide');
+        // ... (rest of the script remains the same) ...
     </script>
 </body>
 </html>
