@@ -2,44 +2,199 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stamp App</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="icon.png" type="image/png">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>STAMP</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        h1 {
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #bb86fc;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background-color: #3700b3;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        button:active {
+            background-color: #6200ee;
+        }
+        #cameraButtons {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        #cameraButtons button {
+            flex: 1;
+            margin: 0 5px;
+        }
+        #captureContainer {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #captureVideo {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        #captureCanvas {
+            display: none;
+        }
+        #gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        #gallery img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(255,255,255,0.1);
+        }
+        #photoButton {
+            background-color: #03dac6;
+            color: #000000;
+        }
+        #photoButton:active {
+            background-color: #018786;
+        }
+    </style>
 </head>
 <body>
-    <h1>Stamp</h1>
-
-    <div id="cameraContainer">
-        <!-- The video element will be inserted here by JavaScript -->
+    <h1>STAMP</h1>
+    
+    <div id="cameraButtons">
+        <button id="wideButton">Wide</button>
+        <button id="ultraWideButton">Ultra Wide</button>
+        <button id="telephotoButton">Telephoto</button>
     </div>
-
-    <div id="controls" role="toolbar" aria-label="Camera controls">
-        <button id="startCapture" aria-label="Start video capture">Start Capture</button>
-        <button id="stopCapture" aria-label="Stop video capture">Stop Capture</button>
-        <button id="switchCamera" aria-label="Switch camera">Switch Camera</button>
-        <button id="takePhoto" aria-label="Take photo">Take Photo</button>
-        <button id="zoom05" aria-label="Set zoom to 0.5x">0.5x Zoom</button>
-        <button id="zoom1" aria-label="Set zoom to 1x">1x Zoom</button>
-        <button id="zoom5" aria-label="Set zoom to 5x">5x Zoom</button>
+    
+    <div id="captureContainer">
+        <video id="captureVideo" autoplay playsinline></video>
+        <canvas id="captureCanvas"></canvas>
     </div>
+    
+    <button id="photoButton">Take Photo</button>
+    
+    <div id="gallery"></div>
 
-    <div id="libraryControls">
-        <button id="processMedia" aria-label="Save recorded video">Save Video</button>
-    </div>
-
-    <div id="loadingIndicator" style="display:none;" role="status" aria-live="polite">
-        Processing... Please wait.
-    </div>
-
-    <script src="app.js"></script>
     <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
-                .then((registration) => console.log('Service Worker registered'))
-                .catch((error) => console.log('Service Worker registration failed:', error));
+        let currentStream;
+        
+        const videoElement = document.getElementById('captureVideo');
+        const canvasElement = document.getElementById('captureCanvas');
+        const photoButton = document.getElementById('photoButton');
+        const gallery = document.getElementById('gallery');
+        const wideButton = document.getElementById('wideButton');
+        const ultraWideButton = document.getElementById('ultraWideButton');
+        const telephotoButton = document.getElementById('telephotoButton');
+
+        async function initCamera(cameraType) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            const constraints = {
+                video: {
+                    facingMode: 'environment',
+                    advanced: [{
+                        // This is a best guess at the constraints. Actual support may vary.
+                        wide: { zoom: 1 },
+                        ultraWide: { zoom: 0.5 },
+                        telephoto: { zoom: 2 }
+                    }[cameraType]]
+                }
+            };
+
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = currentStream;
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                alert(`Unable to access ${cameraType} camera. This may not be supported on your device.`);
+            }
         }
+
+        function capturePhoto() {
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            canvasElement.getContext('2d').drawImage(videoElement, 0, 0);
+            
+            const timestamp = new Date().toISOString();
+            addTextToImage(canvasElement, `Timestamp: ${timestamp}`, 10, 20);
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    addTextToImage(canvasElement, `GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, 10, 40);
+                    savePhoto(canvasElement.toDataURL('image/jpeg'));
+                },
+                (err) => {
+                    console.error("Error getting location:", err);
+                    addTextToImage(canvasElement, "GPS: Unavailable", 10, 40);
+                    savePhoto(canvasElement.toDataURL('image/jpeg'));
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+        }
+
+        function addTextToImage(canvas, text, x, y) {
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.font = 'bold 16px Arial';
+            ctx.lineWidth = 2;
+            ctx.strokeText(text, x, y);
+            ctx.fillText(text, x, y);
+        }
+
+        function savePhoto(dataUrl) {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `STAMP_photo_${new Date().getTime()}.jpg`;
+            a.click();
+            
+            const imgElement = document.createElement('img');
+            imgElement.src = dataUrl;
+            gallery.appendChild(imgElement);
+        }
+
+        photoButton.addEventListener('click', capturePhoto);
+        wideButton.addEventListener('click', () => initCamera('wide'));
+        ultraWideButton.addEventListener('click', () => initCamera('ultraWide'));
+        telephotoButton.addEventListener('click', () => initCamera('telephoto'));
+
+        // Initialize with the wide camera by default
+        initCamera('wide');
     </script>
 </body>
 </html>
