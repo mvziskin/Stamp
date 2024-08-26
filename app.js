@@ -7,6 +7,7 @@ const zoomBtns = document.querySelectorAll('[id^="zoom"]');
 const processMediaBtn = document.getElementById('processMedia');
 const saveMediaBtn = document.getElementById('saveMedia');
 const loadingIndicator = document.getElementById('loadingIndicator');
+const cameraContainer = document.getElementById('cameraContainer');
 
 let stream;
 let currentZoom = 1;
@@ -14,11 +15,12 @@ let currentZoom = 1;
 // Start video capture
 startCaptureBtn.addEventListener('click', async () => {
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
         const videoElement = document.createElement('video');
         videoElement.srcObject = stream;
         videoElement.play();
-        document.body.appendChild(videoElement);
+        cameraContainer.innerHTML = ''; // Clear any existing content
+        cameraContainer.appendChild(videoElement);
     } catch (err) {
         console.error('Error accessing camera:', err);
     }
@@ -28,8 +30,7 @@ startCaptureBtn.addEventListener('click', async () => {
 stopCaptureBtn.addEventListener('click', () => {
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
-        const videoElement = document.querySelector('video');
-        if (videoElement) videoElement.remove();
+        cameraContainer.innerHTML = ''; // Remove the video element
     }
 });
 
@@ -42,9 +43,9 @@ switchCameraBtn.addEventListener('click', async () => {
         
         try {
             stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: newFacingMode } 
+                video: { facingMode: newFacingMode, width: 320, height: 240 } 
             });
-            const videoElement = document.querySelector('video');
+            const videoElement = cameraContainer.querySelector('video');
             if (videoElement) {
                 videoElement.srcObject = stream;
                 videoElement.play();
@@ -58,7 +59,7 @@ switchCameraBtn.addEventListener('click', async () => {
 // Take photo
 takePhotoBtn.addEventListener('click', () => {
     if (stream) {
-        const videoElement = document.querySelector('video');
+        const videoElement = cameraContainer.querySelector('video');
         const canvas = document.createElement('canvas');
         canvas.width = videoElement.videoWidth;
         canvas.height = videoElement.videoHeight;
