@@ -2,20 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STAMP - Silent Video and Photo Capture</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>STAMP - iPhone Camera Capture</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            max-width: 100%;
             margin: 0 auto;
             padding: 20px;
             background-color: #121212;
             color: #ffffff;
+            text-align: center;
         }
-        #cameraButtons, #captureButtons, #zoomButtons {
+        h1 {
+            margin-bottom: 20px;
+        }
+        #cameraButtons, #captureButtons {
             display: flex;
-            justify-content: space-around;
+            justify-content: center;
+            gap: 10px;
             margin-bottom: 20px;
         }
         button {
@@ -49,6 +54,7 @@
         #gallery {
             display: flex;
             flex-wrap: wrap;
+            justify-content: center;
             gap: 10px;
             margin-top: 20px;
         }
@@ -60,6 +66,7 @@
         #errorLog {
             margin-top: 20px;
             color: #ff6b6b;
+            text-align: left;
         }
     </style>
 </head>
@@ -67,14 +74,8 @@
     <h1>STAMP</h1>
 
     <div id="cameraButtons">
-        <button onclick="switchCamera('environment')">Main Camera</button>
-        <button onclick="switchCamera('user')">Front Camera</button>
-    </div>
-
-    <div id="zoomButtons">
-        <button onclick="setZoom(1)">1x (Wide)</button>
-        <button onclick="setZoom(0.5)">0.5x (Ultra Wide)</button>
-        <button onclick="setZoom(3)">3x (Telephoto)</button>
+        <button onclick="switchCamera('ultrawide')">Ultra Wide</button>
+        <button onclick="switchCamera('telephoto')">Telephoto</button>
     </div>
 
     <div id="captureContainer">
@@ -95,7 +96,7 @@
         let stream;
         let isRecording = false;
         let gpsCoordinates = "Loading...";
-        let currentZoom = 1;
+        let currentCamera = 'ultrawide';
         let recordingInterval;
         let recordedFrames = [];
 
@@ -105,12 +106,14 @@
             errorLog.innerHTML += `<p>${message}</p>`;
         }
 
-        async function initCamera(facingMode = 'environment') {
+        async function initCamera(cameraType = 'ultrawide') {
             try {
                 const constraints = {
                     video: {
-                        facingMode: facingMode,
-                        zoom: currentZoom
+                        facingMode: 'environment',
+                        advanced: [{
+                            zoom: cameraType === 'telephoto' ? 2 : 0.5
+                        }]
                     },
                     audio: false
                 };
@@ -148,33 +151,12 @@
             }
         }
 
-        async function switchCamera(facingMode) {
+        async function switchCamera(cameraType) {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
-            await initCamera(facingMode);
-        }
-
-        async function setZoom(zoom) {
-            currentZoom = zoom;
-            if (stream) {
-                const videoTrack = stream.getVideoTracks()[0];
-                const capabilities = videoTrack.getCapabilities();
-                const settings = videoTrack.getSettings();
-
-                if ('zoom' in capabilities) {
-                    try {
-                        await videoTrack.applyConstraints({advanced: [{zoom: zoom}]});
-                        console.log("Zoom set to:", zoom);
-                    } catch (e) {
-                        logError("Error setting zoom: " + e.message);
-                    }
-                } else {
-                    console.log('Zoom is not supported by this browser/device');
-                }
-            } else {
-                logError("No active stream to apply zoom");
-            }
+            currentCamera = cameraType;
+            await initCamera(cameraType);
         }
 
         function takePhoto() {
@@ -254,7 +236,7 @@
             const timestamp = new Date().toLocaleString();
             ctx.fillText(`Timestamp: ${timestamp}`, 10, 30);
             ctx.fillText(`GPS: ${gpsCoordinates}`, 10, 60);
-            ctx.fillText(`Zoom: ${currentZoom}x`, 10, 90);
+            ctx.fillText(`Camera: ${currentCamera}`, 10, 90);
 
             requestAnimationFrame(updateOverlay);
         }
