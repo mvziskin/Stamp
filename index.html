@@ -5,11 +5,113 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>STAMP - Silent Video and Photo Capture</title>
     <style>
-        /* ... (previous CSS remains unchanged) ... */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --button-bg: #f0f0f0;
+            --button-text: #000000;
+        }
+        
+        body.dark-theme {
+            --bg-color: #121212;
+            --text-color: #ffffff;
+            --button-bg: #333333;
+            --button-text: #ffffff;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        #cameraButtons, #captureButtons, #zoomButtons {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        button:hover {
+            opacity: 0.8;
+        }
+        #captureContainer {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            position: relative;
+        }
+        #videoElement, #canvasElement {
+            width: 100%;
+            background-color: #2c2c2c;
+        }
+        #canvasElement {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        #gallery img, #gallery video {
+            max-width: 200px;
+            max-height: 200px;
+            object-fit: cover;
+        }
+        #themeToggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        #errorLog {
+            margin-top: 20px;
+            color: red;
+        }
     </style>
 </head>
 <body>
-    <!-- ... (previous HTML structure remains unchanged) ... -->
+    <h1>STAMP</h1>
+
+    <button id="themeToggle" onclick="toggleTheme()">Toggle Theme</button>
+
+    <div id="cameraButtons">
+        <button onclick="switchCamera('environment')">Main Camera</button>
+        <button onclick="switchCamera('user')">Front Camera</button>
+    </div>
+
+    <div id="zoomButtons">
+        <button onclick="setZoom(1)">1x (Wide)</button>
+        <button onclick="setZoom(0.5)">0.5x (Ultra Wide)</button>
+        <button onclick="setZoom(3)">3x (Telephoto)</button>
+    </div>
+
+    <div id="captureContainer">
+        <video id="videoElement" autoplay playsinline muted></video>
+        <canvas id="canvasElement"></canvas>
+    </div>
+
+    <div id="captureButtons">
+        <button onclick="takePhoto()">Take Photo</button>
+        <button id="recordButton" onclick="toggleRecording()">Start Recording</button>
+    </div>
+
+    <div id="gallery"></div>
+
+    <div id="errorLog"></div>
 
     <script>
         let stream;
@@ -18,6 +120,12 @@
         let isRecording = false;
         let gpsCoordinates = "Loading...";
         let currentZoom = 1;
+
+        function logError(message) {
+            console.error(message);
+            const errorLog = document.getElementById('errorLog');
+            errorLog.innerHTML += `<p>${message}</p>`;
+        }
 
         async function initCamera(facingMode = 'environment') {
             try {
@@ -29,50 +137,112 @@
                     audio: false
                 };
 
+                console.log("Requesting camera access with constraints:", constraints);
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log("Camera access granted, stream:", stream);
+
                 const videoElement = document.getElementById('videoElement');
+                if (!videoElement) {
+                    throw new Error("Video element not found");
+                }
+
                 videoElement.srcObject = stream;
+                console.log("Stream set to video element");
+
                 videoElement.onloadedmetadata = () => {
+                    console.log("Video metadata loaded");
                     const canvas = document.getElementById('canvasElement');
+                    if (!canvas) {
+                        throw new Error("Canvas element not found");
+                    }
                     canvas.width = videoElement.videoWidth;
                     canvas.height = videoElement.videoHeight;
+                    console.log("Canvas dimensions set");
+                    updateOverlay();
                 };
-                updateOverlay();
+
+                videoElement.onerror = (error) => {
+                    logError("Video element error: " + error);
+                };
+
             } catch (err) {
-                console.error("Error accessing the camera: ", err);
-                alert("Error accessing the camera: " + err.message);
+                logError("Error accessing the camera: " + err.message);
             }
         }
 
-        // ... (other functions remain unchanged) ...
+        async function switchCamera(facingMode) {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            await initCamera(facingMode);
+        }
+
+        async function setZoom(zoom) {
+            currentZoom = zoom;
+            if (stream) {
+                const videoTrack = stream.getVideoTracks()[0];
+                const capabilities = videoTrack.getCapabilities();
+                const settings = videoTrack.getSettings();
+
+                if ('zoom' in capabilities) {
+                    try {
+                        await videoTrack.applyConstraints({advanced: [{zoom: zoom}]});
+                        console.log("Zoom set to:", zoom);
+                    } catch (e) {
+                        logError("Error setting zoom: " + e.message);
+                    }
+                } else {
+                    console.log('Zoom is not supported by this browser/device');
+                }
+            } else {
+                logError("No active stream to apply zoom");
+            }
+        }
+
+        function takePhoto() {
+            const canvas = document.getElementById('canvasElement');
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/jpeg');
+            document.getElementById('gallery').prepend(img);
+            console.log("Photo taken and added to gallery");
+        }
+
+        function toggleRecording() {
+            const recordButton = document.getElementById('recordButton');
+            if (!isRecording) {
+                startRecording();
+                recordButton.textContent = 'Stop Recording';
+                isRecording = true;
+            } else {
+                stopRecording();
+                recordButton.textContent = 'Start Recording';
+                isRecording = false;
+            }
+        }
 
         function startRecording() {
             recordedChunks = [];
             const canvas = document.getElementById('canvasElement');
             const stream = canvas.captureStream(30); // 30 FPS, no audio
 
-            const options = { mimeType: 'video/webm' };
             try {
-                mediaRecorder = new MediaRecorder(stream, options);
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
             } catch (e) {
-                console.error("Error creating MediaRecorder:", e);
-                alert("Error creating MediaRecorder: " + e.message);
+                logError("Error creating MediaRecorder: " + e.message);
                 return;
             }
 
             mediaRecorder.ondataavailable = handleDataAvailable;
             mediaRecorder.onstop = saveVideo;
             mediaRecorder.onerror = (event) => {
-                console.error("MediaRecorder error:", event.error);
-                alert("MediaRecorder error: " + event.error);
+                logError("MediaRecorder error: " + event.error);
             };
 
             try {
                 mediaRecorder.start();
                 console.log("MediaRecorder started", mediaRecorder.state);
             } catch (e) {
-                console.error("Error starting MediaRecorder:", e);
-                alert("Error starting MediaRecorder: " + e.message);
+                logError("Error starting MediaRecorder: " + e.message);
             }
         }
 
@@ -93,8 +263,7 @@
         function saveVideo() {
             console.log("Saving video, chunks:", recordedChunks.length);
             if (recordedChunks.length === 0) {
-                console.error("No recorded chunks to save");
-                alert("No video data recorded");
+                logError("No recorded chunks to save");
                 return;
             }
 
@@ -110,14 +279,52 @@
             document.getElementById('gallery').prepend(video);
         }
 
-        // ... (other functions remain unchanged) ...
+        function updateOverlay() {
+            const video = document.getElementById('videoElement');
+            const canvas = document.getElementById('canvasElement');
+            const ctx = canvas.getContext('2d');
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            
+            const timestamp = new Date().toLocaleString();
+            ctx.fillText(`Timestamp: ${timestamp}`, 10, 30);
+            ctx.fillText(`GPS: ${gpsCoordinates}`, 10, 60);
+            ctx.fillText(`Zoom: ${currentZoom}x`, 10, 90);
+
+            requestAnimationFrame(updateOverlay);
+        }
+
+        function getGPSLocation() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        gpsCoordinates = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+                    },
+                    (error) => {
+                        logError("Error getting GPS location: " + error.message);
+                        gpsCoordinates = "Unable to retrieve";
+                    }
+                );
+            } else {
+                logError("Geolocation is not supported by this browser.");
+                gpsCoordinates = "Not supported";
+            }
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+        }
 
         // Initialize the camera and GPS when the page loads
-        window.onload = () => {
+        document.addEventListener('DOMContentLoaded', () => {
             initCamera();
             getGPSLocation();
             setInterval(getGPSLocation, 10000);
-        };
+        });
     </script>
 </body>
 </html>
