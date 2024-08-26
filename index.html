@@ -3,236 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stamp</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <link rel="apple-touch-icon" href="icon.png">
+    <title>Stamp App</title>
     <link rel="manifest" href="manifest.json">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 0;
-            padding: 20px;
-        }
-        #video, #selectedMedia {
-            width: 100%;
-            max-width: 640px;
-            height: auto;
-        }
-        #canvas {
-            display: none;
-        }
-        button {
-            font-size: 14px;
-            margin: 5px;
-            padding: 8px 12px;
-        }
-        #controls, #libraryControls, #processedControls {
-            margin-top: 10px;
-        }
-        #capturedPhoto {
-            max-width: 100%;
-            display: none;
-            margin-top: 20px;
-        }
-        #loadingIndicator {
-            display: none;
-            margin-top: 10px;
-        }
-    </style>
+    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <h1>Stamp</h1>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-    <img id="capturedPhoto" alt="Captured photo">
-    <img id="selectedMedia" alt="Selected media" style="display:none;">
+
     <div id="controls">
-        <button id="startBtn">Start Capture</button>
-        <button id="stopBtn" disabled>Stop Capture</button>
-        <button id="switchCameraBtn">Switch Camera</button>
-        <button id="takePhotoBtn">Take Photo</button>
-        <button id="zoomWideBtn">0.5x Zoom</button>
-        <button id="zoomNormalBtn">1x Zoom</button>
-        <button id="zoomTeleBtn">5x Zoom</button>
+        <button id="startCapture">Start Capture</button>
+        <button id="stopCapture">Stop Capture</button>
+        <button id="switchCamera">Switch Camera</button>
+        <button id="takePhoto">Take Photo</button>
+        <button id="zoom05">0.5x Zoom</button>
+        <button id="zoom1">1x Zoom</button>
+        <button id="zoom5">5x Zoom</button>
     </div>
+
     <div id="libraryControls">
-        <input type="file" id="mediaInput" accept="image/*,video/*">
-        <button id="processMediaBtn">Process Selected Media</button>
+        <button id="processMedia">Process Selected Media</button>
     </div>
+
     <div id="processedControls" style="display:none;">
-        <button id="saveProcessedBtn">Save Processed Media</button>
+        <button id="saveMedia">Save Processed Media</button>
     </div>
-    <div id="loadingIndicator">Processing... Please wait.</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mp4box/0.5.2/mp4box.all.min.js"></script>
+    <div id="loadingIndicator" style="display:none;">
+        Processing... Please wait.
+    </div>
+
+    <script src="app.js"></script>
     <script>
-        let video, canvas, context, mediaRecorder, chunks = [];
-        let currentFacingMode = 'environment';
-        let currentZoom = 1;
-        let stream;
-        let currentPosition = null;
-
-        // ... [Previous functions remain largely the same: setupCamera, startCamera, updateZoomButtons, setZoom, startLocationTracking, switchCamera, startCapture, stopCapture] ...
-
-        function drawOverlay(timestamp, location, zoomText) {
-            canvas.width = video.videoWidth || canvas.width;
-            canvas.height = video.videoHeight || canvas.height;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            context.font = `${canvas.width / 30}px Arial`;
-            context.fillStyle = 'white';
-            context.strokeStyle = 'black';
-            context.lineWidth = canvas.width / 300;
-
-            const timeY = canvas.height - 10;
-            const locationY = canvas.height - 10 - canvas.width / 25;
-            const zoomY = canvas.height - 10 - (canvas.width / 25) * 2;
-
-            drawText(timestamp, timeY);
-            drawText(location, locationY);
-            if (zoomText) drawText(zoomText, zoomY);
-
-            if (video.srcObject) {
-                requestAnimationFrame(() => drawOverlay(
-                    new Date().toLocaleString(),
-                    currentPosition ? `${currentPosition.coords.latitude.toFixed(6)}, ${currentPosition.coords.longitude.toFixed(6)}` : 'Location unavailable',
-                    `Zoom: ${currentZoom.toFixed(1)}x`
-                ));
-            }
-        }
-
-        function drawText(text, y) {
-            const textWidth = context.measureText(text).width;
-            const x = canvas.width - textWidth - 10;
-            context.strokeText(text, x, y);
-            context.fillText(text, x, y);
-        }
-
-        function processSelectedMedia() {
-            const fileInput = document.getElementById('mediaInput');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Please select a file first.');
-                return;
-            }
-
-            document.getElementById('loadingIndicator').style.display = 'block';
-
-            if (file.type.startsWith('image/')) {
-                processImage(file);
-            } else if (file.type.startsWith('video/')) {
-                processVideo(file);
-            } else {
-                alert('Unsupported file type. Please select an image or video.');
-                document.getElementById('loadingIndicator').style.display = 'none';
-            }
-        }
-
-        function processImage(file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = document.getElementById('selectedMedia');
-                img.onload = function() {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    context.drawImage(img, 0, 0, img.width, img.height);
-                    
-                    EXIF.getData(img, function() {
-                        let timestamp, location;
-                        try {
-                            timestamp = EXIF.getTag(this, "DateTimeOriginal") || "Timestamp not available";
-                            const lat = EXIF.getTag(this, "GPSLatitude");
-                            const lon = EXIF.getTag(this, "GPSLongitude");
-                            location = (lat && lon) ? `${lat[0]}°${lat[1]}'${lat[2]}"N, ${lon[0]}°${lon[1]}'${lon[2]}"E` : "Location not available";
-                        } catch (error) {
-                            console.error('Error extracting EXIF data:', error);
-                            timestamp = "Timestamp extraction failed";
-                            location = "Location extraction failed";
-                        }
-                        
-                        drawOverlay(timestamp, location, "");
-                        
-                        const processedImg = document.getElementById('capturedPhoto');
-                        processedImg.src = canvas.toDataURL('image/jpeg');
-                        processedImg.style.display = 'block';
-                        document.getElementById('processedControls').style.display = 'block';
-                        document.getElementById('loadingIndicator').style.display = 'none';
-                    });
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function processVideo(file) {
-            const video = document.createElement('video');
-            video.preload = 'metadata';
-            
-            video.onloadedmetadata = function() {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const arrayBuffer = e.target.result;
-                    const mp4boxfile = MP4Box.createFile();
-                    mp4boxfile.onReady = function(info) {
-                        let creationTime = new Date(info.created * 1000).toLocaleString();
-                        let location = "Location not available";
-
-                        // Check for GPS metadata
-                        if (info.moov && info.moov.udta && info.moov.udta.gpsd) {
-                            const gps = info.moov.udta.gpsd;
-                            location = `${gps.latitude}, ${gps.longitude}`;
-                        }
-
-                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        drawOverlay(creationTime, location, "");
-
-                        const processedImg = document.getElementById('capturedPhoto');
-                        processedImg.src = canvas.toDataURL('image/jpeg');
-                        processedImg.style.display = 'block';
-                        document.getElementById('processedControls').style.display = 'block';
-                        document.getElementById('loadingIndicator').style.display = 'none';
-                    };
-                    mp4boxfile.onError = function(e) {
-                        console.error('Error processing video metadata:', e);
-                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        drawOverlay("Timestamp extraction failed", "Location extraction failed", "");
-                        
-                        const processedImg = document.getElementById('capturedPhoto');
-                        processedImg.src = canvas.toDataURL('image/jpeg');
-                        processedImg.style.display = 'block';
-                        document.getElementById('processedControls').style.display = 'block';
-                        document.getElementById('loadingIndicator').style.display = 'none';
-                    };
-                    mp4boxfile.appendBuffer(arrayBuffer);
-                    mp4boxfile.flush();
-                };
-                reader.readAsArrayBuffer(file);
-            };
-            video.src = URL.createObjectURL(file);
-        }
-
-        function saveProcessedMedia() {
-            const processedImg = document.getElementById('capturedPhoto');
-            const link = document.createElement('a');
-            link.download = 'processed_media_' + new Date().getTime() + '.jpg';
-            link.href = processedImg.src;
-            link.click();
-        }
-
-        // ... [Previous event listeners remain the same] ...
-        document.getElementById('processMediaBtn').addEventListener('click', processSelectedMedia);
-        document.getElementById('saveProcessedBtn').addEventListener('click', saveProcessedMedia);
-
-        document.addEventListener('DOMContentLoaded', setupCamera);
-
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js');
+            navigator.serviceWorker.register('/service-worker.js')
+                .then((registration) => console.log('Service Worker registered'))
+                .catch((error) => console.log('Service Worker registration failed:', error));
         }
     </script>
 </body>
