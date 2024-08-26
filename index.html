@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STAMP - Video and Photo Capture</title>
+    <title>STAMP - Silent Video and Photo Capture</title>
     <style>
         :root {
             --bg-color: #ffffff;
@@ -28,7 +28,7 @@
             color: var(--text-color);
             transition: background-color 0.3s, color 0.3s;
         }
-        #cameraButtons, #captureButtons {
+        #cameraButtons, #captureButtons, #zoomButtons {
             display: flex;
             justify-content: space-around;
             margin-bottom: 20px;
@@ -89,14 +89,14 @@
         <button onclick="switchCamera('user')">Front Camera</button>
     </div>
 
-    <div id="lensButtons">
-        <button onclick="switchLens('wide')">Wide</button>
-        <button onclick="switchLens('ultra-wide')">Ultra Wide</button>
-        <button onclick="switchLens('telephoto')">Telephoto</button>
+    <div id="zoomButtons">
+        <button onclick="setZoom(1)">1x (Wide)</button>
+        <button onclick="setZoom(0.5)">0.5x (Ultra Wide)</button>
+        <button onclick="setZoom(3)">3x (Telephoto)</button>
     </div>
 
     <div id="captureContainer">
-        <video id="videoElement" autoplay playsinline></video>
+        <video id="videoElement" autoplay playsinline muted></video>
         <canvas id="canvasElement"></canvas>
     </div>
 
@@ -113,20 +113,16 @@
         let recordedChunks = [];
         let isRecording = false;
         let gpsCoordinates = "Loading...";
-        let currentLens = 'wide';
+        let currentZoom = 1;
 
         async function initCamera(facingMode = 'environment') {
             try {
                 const constraints = {
                     video: {
                         facingMode: facingMode,
-                        // Attempt to select a specific lens
-                        advanced: [{ 
-                            facingMode: facingMode,
-                            zoom: currentLens === 'telephoto' ? 2 : 1 // Simulate telephoto with zoom
-                        }]
+                        zoom: currentZoom
                     },
-                    audio: true
+                    audio: false // Explicitly disable audio
                 };
 
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -150,9 +146,17 @@
             await initCamera(facingMode);
         }
 
-        async function switchLens(lens) {
-            currentLens = lens;
-            await initCamera('environment');
+        async function setZoom(zoom) {
+            currentZoom = zoom;
+            const videoTrack = stream.getVideoTracks()[0];
+            const capabilities = videoTrack.getCapabilities();
+            const settings = videoTrack.getSettings();
+
+            if ('zoom' in capabilities) {
+                await videoTrack.applyConstraints({advanced: [{zoom: zoom}]});
+            } else {
+                console.log('Zoom is not supported by this browser/device');
+            }
         }
 
         function takePhoto() {
@@ -178,9 +182,12 @@
         function startRecording() {
             recordedChunks = [];
             const canvas = document.getElementById('canvasElement');
-            const stream = canvas.captureStream(30); // 30 FPS
+            const stream = canvas.captureStream(30); // 30 FPS, no audio
 
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            mediaRecorder = new MediaRecorder(stream, { 
+                mimeType: 'video/webm; codecs=vp9',
+                videoBitsPerSecond: 5000000 // Adjust as needed for quality vs file size
+            });
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) {
                     recordedChunks.push(e.data);
@@ -199,6 +206,7 @@
             const videoUrl = URL.createObjectURL(blob);
             const video = document.createElement('video');
             video.src = videoUrl;
+            video.muted = true; // Ensure playback is muted
             video.controls = true;
             document.getElementById('gallery').prepend(video);
         }
@@ -216,7 +224,7 @@
             const timestamp = new Date().toLocaleString();
             ctx.fillText(`Timestamp: ${timestamp}`, 10, 30);
             ctx.fillText(`GPS: ${gpsCoordinates}`, 10, 60);
-            ctx.fillText(`Lens: ${currentLens}`, 10, 90);
+            ctx.fillText(`Zoom: ${currentZoom}x`, 10, 90);
 
             requestAnimationFrame(updateOverlay);
         }
