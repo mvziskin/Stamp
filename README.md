@@ -1,1 +1,3 @@
-time stamp photos and videos
+time stamp photos
+
+todo: video
