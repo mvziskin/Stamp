@@ -11,6 +11,20 @@ h1 {
     color: #333;
 }
 
+#cameraContainer {
+    width: 320px;
+    height: 240px;
+    margin: 0 auto 20px;
+    background-color: #000;
+    overflow: hidden;
+}
+
+#cameraContainer video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 button {
     background-color: #4CAF50;
     border: none;
@@ -31,6 +45,7 @@ button:hover {
 
 #controls, #libraryControls, #processedControls {
     margin-bottom: 20px;
+    text-align: center;
 }
 
 #loadingIndicator {
@@ -39,7 +54,7 @@ button:hover {
     color: #333;
 }
 
-video, img {
+img {
     max-width: 100%;
     height: auto;
     display: block;
